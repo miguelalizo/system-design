@@ -1,9 +1,5 @@
 # Databases
 
-# TODO:
-- CAP Theorem
-- ACID principles
-
 Types:
 1. Relational
 2. Document

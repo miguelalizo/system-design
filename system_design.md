@@ -6,17 +6,17 @@
 1.  [Vert vs Horz scaling](#vertical-vs-horizontal-scaling)
 1.  [Load balancer](#load-balancer)
 1.  [* DBs](#databases)
-1.  [* DB Replication](#db-replication)
+1.  [DB-Partitioning-Replication Consistency-Availability](#db-partitioning-replication-consistency-availability)
 1.  [DB Scaling](#db-scaling)
 1.  [CAP Theroem](#cap-theorem)
+1.  [* ACID](#acid-cap)
 1.  [Cache](#cache)
 1.  [CDN](#cdn)
 1.  [DNS](#dns)
 1.  [Data centers](#data-centers)
 1.  [Message Queue](#message-queue)
 1.  [Web Tier; stateless vs stateful](#web-tier)
-1.  [* Networking / HTTP / Web Sockets](#networking-http-web-sockets)
-1.  [* ACID / CAP](#acid-cap)
+1.  [Networking / HTTP / Web Sockets](#networking-http-web-sockets)
 1.  [Logging / Metrics / Automation](#logging-metrics-and-automation)
 1.  [* Patterns](#patterns)
     -  [* Consistent hashing and why](#consistent-hashing)
@@ -186,7 +186,7 @@ When to use
 Examples (3rd pty, Amazon, Azure)
 
 
-## DB Partitioning, Replication, Consistency and availability
+## DB-Partitioning-Replication Consistency-Availability
 
 [Back to main](#contents)
 
@@ -198,6 +198,7 @@ There are two challenges when partitioning data:
 - how to distribute data evenly across the servers
 - minimize the data movement when nodes are added or removed
 
+#### Consistent Hashing
 **Consistent Hashing** solves these problems:
 - servers are placed on a hashring
 - key is hashed onto the ring and the data is stored in the first server encountered while moving in clockwise direction
@@ -308,23 +309,13 @@ CAP theroem states that it is impossible for a distributed system to simultaneou
 - availability: means any client which requests data gets a response even if some of the nodes are down
 - partition tolerance: a partition indicates a communication break between two nodes. Partition tolerance means the system continues to operate despite network partitions
 
-**Design a key-value store: System design Vol 1**
+CP: Consistency and Partittion tolerance System
+- Supports consistency and parition tolerance while sacrificing availability
 
-CP:
+AP: Availability and partition tolerance
+- Supports availability and partition tolerance while sacrificing consistency
 
-AP:
-
-CA:
-
-Real world distributed systems:
-
-Data partition: consistent hashing!
-
-Data replication and Consistency:Quorum consistency: N, W, R
-
-Consistency models: strong consistency, weak consistency, eventual consistency
-
-Inconsistency resolution:
+CA:  Network failiures are unavoidable. For a system to support consistency OR availability, it must be partition tolerant.
 
 ## Cache
 
