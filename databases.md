@@ -1,5 +1,9 @@
 # Databases
 
+# TODO:
+- CAP Theorem
+- ACID principles
+
 Types:
 1. Relational
 2. Document
@@ -61,7 +65,6 @@ Provides a consistent way of storing completely different types of objects in a 
 
 ### When to use
 - highly interconnected data (many-to-many relations)
-- 
 
 ## Other concepts
 
