@@ -4,21 +4,29 @@
 
 1.  [System Design Framework](#system-design-framework)
 1.  [Vert vs Horz scaling](#vertical-vs-horizontal-scaling)
-1. [Latency vs Throughput](#latency-vs-throughput)
+1.  [Latency vs Throughput](#latency-vs-throughput)
 1.  [Load balancer](#load-balancer)
 1.  [* DBs](#databases)
+    - [SQL](#sql)
+        - [ACID](#acid)
+    - [NoSQL](#nosql)
 1.  [DB-Partitioning-Replication Consistency-Availability](#db-partitioning-replication-consistency-availability)
-1.  [DB Scaling](#db-scaling)
+    - [DB Vertical Scaling](#db-vertical-scaling)
+    - [DB Horizontal Scaling](#db-horizontal-scaling)
+    - [Partitioning](#partitioning)
+    - [Replication](#replication)
+    - [Consistency](#consistency)
+    - [Availability](#availability)
 1.  [CAP Theroem](#cap-theorem)
-1.  [* ACID](#acid-cap)
 1.  [Cache](#cache)
 1.  [CDN](#cdn)
 1.  [DNS](#dns)
 1.  [Reverse Proxy](#reverse-proxy)
+1.  [Application Layer](#application-layer)
 1.  [Data centers](#data-centers)
-1.  [Message Queue](#message-queue)
+1.  [* Asynchronism Message Queue](#message-queue)
 1.  [Web Tier; stateless vs stateful](#web-tier)
-1.  [Networking / HTTP / Web Sockets](#networking-http-web-sockets)
+1.  [* Networking / HTTP / Web Sockets](#networking-http-web-sockets)
 1.  [Logging / Metrics / Automation](#logging-metrics-and-automation)
 1.  [* Patterns](#patterns)
     -  [* Consistent hashing and why](#consistent-hashing)
@@ -135,15 +143,46 @@ Pros
 
 [Back to main](#contents)
 
-### SQL vs NoSQL
+### SQL
 
-Relational (SQL)
+Relational Database Management System (RDBMS)
+
+A relational database like SQL is a collection of data items organized in tables.
+
+#### ACID
+
+ACID is a set of properties of relational database transactions.
+- Atomicity - Each transaction is all or nothing
+    - Atomicity ensures that each transaction is treated as a single, indivisible unit of work. This means that either all operations within the transaction are completed successfully and committed, or if any operation fails, the entire transaction is rolled back (undone) to maintain data consistency.
+    - For example, in a banking transaction where money is transferred from one account to another, atomicity ensures that if the withdrawal from one account succeeds, the deposit to the other account will also succeed. If either operation fails, the entire transaction (both operations) is aborted.
+- Consistency - Any transaction will bring the database from one valid state to another
+    - Consistency guarantees that the database remains in a consistent state before and after the execution of any transaction. This means that transactions cannot violate any integrity constraints or rules defined for the database schema.
+        - **Note: This refers to a single DB not replication consistency**
+     - Database consistency ensures that all data written to the database is valid according to all defined rules, including constraints, cascades, and triggers. It prevents transactions from leaving the database in an invalid state.
+- Isolation - Executing transactions concurrently has the same results as if the transactions were executed serially
+    - Isolation ensures that multiple transactions can execute concurrently without affecting each other. Each transaction should operate independently as if it were the only transaction being executed on the database.
+    - Isolation prevents interference between transactions, such as ensuring that one transaction's intermediate state is not visible to another transaction until it is committed. This is achieved through techniques such as locking, concurrency control, and isolation levels.
+- Durability - Once a transaction has been committed, it will remain so
+    - Durability guarantees that once a transaction has been committed, it will persist even in the event of a system failure (such as power outage, crash, or error). Committed transactions should not be lost and should survive any form of system failure.
+    - This is typically achieved by writing transaction changes (committed data) to non-volatile storage (usually disk) in a manner that ensures data persistence. Even if the database system crashes immediately after a transaction is committed, the changes made by the transaction should still be available when the system is recovered.
+
 - Stores data in tables and rows
 - Supports joins across tables and supprots many-to-many relationships
 - Examples:
     - MySQL
     - PostgreSQL
     - Oracle
+
+#### Techniques for scaling RDBMS
+- There are many techniques to scale a relational database:
+    - [master-slave replication](#master-slave-replication)
+    - [master-master replication](#master-master-replication)
+    - [federation](#federation)
+    - [sharding](#sharding)
+    - [denormalization](#denormalizing)
+    - [SQL tuning](#sql-tuning)
+
+### NoSQL
 
 NoSQL:
 - 1. Key Value Stores
@@ -196,11 +235,35 @@ When to use
 Examples (3rd pty, Amazon, Azure)
 
 
+
+
+
 ## DB-Partitioning-Replication Consistency-Availability
 
 [Back to main](#contents)
 
+### DB Vertical Scaling
+
+- adding more CPU, RAM, DISK, etc to an existing machine
+- drawbacks:
+    - there are hardware limits. If you have a large user base a single db server is not enough
+    - greater risk of SPOF
+    - overall cost of vertical scaling is high
+
+### DB Horizontal Scaling
+
+- [Replication](#replication)
+    - Master-slave
+    - Master-master
+- [Partitioning](#partitioning)
+    - Federation
+    - Sharding
+- [Denormalizing](#denormalizing)
+- [SQL Tuning](#sql-tuning)
+
 ### Partitioning
+
+(Horizontally scaling)
 
 For large applications, it is infeasable top fit the entire dataset in a single server. The simplest solution is to split the data into smaller partitions and store them in multiple servers.
 
@@ -208,7 +271,38 @@ There are two challenges when partitioning data:
 - how to distribute data evenly across the servers
 - minimize the data movement when nodes are added or removed
 
-#### Consistent Hashing
+#### Federation
+
+Federation (or functional partitioning) splits up databases by function.
+
+For example, instead of a single, monolithic database, you could have three databases: forums, users, and products, resulting in less read and write traffic to each database and therefore less replication lag. Smaller databases result in more data that can fit in memory, which in turn results in more cache hits due to improved cache locality. With no single central master serializing writes you can write in parallel, increasing throughput.
+
+Disadvantage(s): federation
+- Federation is not effective if your schema requires huge functions or tables.
+- You'll need to update your application logic to determine which database to read and write.
+- Joining data from two databases is more complex with a server link.
+- Federation adds more hardware and additional complexity.
+
+
+#### Sharding
+
+Horizontal Scaling (sharding)
+- adding more servers!
+- separates large databases into smaller, more easily managed parts called shards. Each shard shares the same schema although the data is unique to each shard
+- Sharding key (also known as a partition key) is the most important factor to consider when implementing a sharding strategy. Determines how data is distributed
+    - A sharding key allows you to retreive and modify data efficiently by routing the database queries to the correct database.
+    - **One of the most important criteria is chosing a sharding key that can evenly distrubute the distributed data.**
+- sharding introduces additional complexity and challenges
+    - resharding data: resharding is needed when
+        1. a single shard could no longer hold the data due to growth
+        2. Uneven distribution of data might cause certain shards to experience shard exhaustion faster
+    - when shard exhaustion happens, updating the sharding function and redistributing thew data must occur.
+        - [Consistent Hashing](#consistent-hashing) is a commonly used technique to solve this problem
+    - Celebrity problem: also called a hotspot key problem.
+        - Exessive access to a specific shard can cause server overload. To mitigate this problem, a single or multiple shards may need to be allocated to a celebrity or hot key
+    - Join and de-normalization: It is hard to perform join across a db that has been sharded. A common work around is to denormalize the shard so queries can be performed in a single table
+
+##### Consistent Hashing
 **Consistent Hashing** solves these problems:
 - servers are placed on a hashring
 - key is hashed onto the ring and the data is stored in the first server encountered while moving in clockwise direction
@@ -219,13 +313,60 @@ Advantges of consistent hashing:
 - only k/n nodes need to be remapped on average. Where k is the number of keys and n is the number of slots
 - SHA1 is a common hashing function
 
+#### Denormalizing
+
+Denormalization attempts to improve read performance at the expense of some write performance. Redundant copies of the data are written in multiple tables to avoid expensive joins. Some RDBMS such as PostgreSQL and Oracle support materialized views which handle the work of storing redundant information and keeping redundant copies consistent.
+
+Once data becomes distributed with techniques such as federation and sharding, managing joins across data centers further increases complexity. Denormalization might circumvent the need for such complex joins.
+
+In most systems, reads can heavily outnumber writes 100:1 or even 1000:1. A read resulting in a complex database join can be very expensive, spending a significant amount of time on disk operations.
+
+Disadvantage(s): denormalization
+- Data is duplicated.
+- Constraints can help redundant copies of information stay in sync, which increases complexity of the database design.
+- A denormalized database under heavy write load might perform worse than its normalized counterpart.
+
+
+#### SQL Tuning
+
+SQL tuning refers to the process of optimizing SQL queries and database performance to improve efficiency, reduce execution time, and enhance overall system responsiveness. Here’s a quick summary of SQL tuning:
+
+ 1. Identifying Bottlenecks: Analyzing the performance of SQL queries to identify bottlenecks, such as slow-running queries or resource-intensive operations.
+
+2. Query Optimization: Rewriting SQL queries to improve efficiency, using techniques like:
+- Restructuring queries to minimize unnecessary joins or subqueries.
+- Optimizing WHERE clauses and using appropriate indexes to speed up data retrieval.
+- Avoiding unnecessary data sorting or aggregations.
+
+3. Indexing: Creating and maintaining appropriate indexes on tables to facilitate quick data access and query optimization. This includes understanding different types of indexes (e.g., B-tree, hash indexes) and their impact on query performance.
+
+4. Statistics Management: Ensuring that database statistics are up-to-date to help the query optimizer generate efficient execution plans. This involves regularly updating statistics on tables and indexes.
+
+5. Database Schema Design: Designing an efficient database schema that minimizes data redundancy and optimizes query performance. This includes normalization and denormalization strategies based on specific use cases.
+
+6. Query Execution Plan: Understanding and analyzing the query execution plan generated by the database optimizer. This helps in identifying potential performance issues and optimizing query execution paths.
+
+7. Monitoring and Profiling: Monitoring database performance metrics and profiling SQL queries to capture and analyze execution times, resource consumption, and inefficiencies.
+
+8. Application Design Considerations: Optimizing SQL queries should also consider application design patterns and access patterns to ensure that database interactions align with application requirements and performance goals.
+
 ### Replication
 
 To achieve high availability and reliability, data must be replicated asynchronously over N servers, where N is a configurable parameter.
 
+#### Master Slave Replication
+
 Master/Slave relatiopnship can be used for data replication in database management systems.
 
 A master database generally is used for write operations and slave databases are used to distribute read operations. (Generally the access pattern is more reads than writes so you may have more slaves).
+
+#### Master-Master Replication
+
+Both masters serve reads and writes and coordinate with each other on writes. If either master goes down, the system can continue to operate with both reads and writes.
+
+Disadvantage(s): master-master replication
+- You'll need a load balancer or you'll need to make changes to your application logic to determine where to write.
+- Most master-master systems are either loosely consistent (violating ACID) or have increased write latency due to synchronization.
 
 Advantages of database replication:
 - Better performance
@@ -233,6 +374,12 @@ Advantages of database replication:
 - Reliability:
     - In case a database server fails, you dont need to worry about data loss because the data is replicated across multiple locations.
     - High availability: Website remains operational even if one database is offline.
+
+Disadvantages of replication:
+- There is a potential for loss of data if the master fails before any newly written data can be replicated to other nodes.
+- Writes are replayed to the read replicas. If there are a lot of writes, the read replicas can get bogged down with replaying writes and can't do as many reads.
+- The more read slaves, the more you have to replicate, which leads to greater replication lag.
+- More hardware and additional complexity
 
 What if a database server goes offline?
 - Slave failiure:
@@ -298,33 +445,6 @@ Two complimentary patterns to support high availability:
     - In active-active, both servers are managing traffic, spreading the load between them.
     - If the servers are public-facing, the DNS would need to know about the public IPs of both servers. If the servers are internal-facing, application logic would need to know about both servers.
     - Active-active failover can also be referred to as master-master failover.
-
-## DB Scaling
-
-[Back to main](#contents)
-
-Vertical Scaling
-- adding more CPU, RAM, DISK, etc to an existing machine
-- drawbacks:
-    - there are hardware limits. If you have a large user base a single db server is not enough
-    - greater risk of SPOF
-    - overall cost of vertical scaling is high
-
-Horizontal Scaling (sharding)
-- adding more servers!
-- separates large databases into smaller, more easily managed parts called shards. Each sshard shares the same schema although the data is unique to each shard
-- Sharding key (also known as a partition key) is the most important factor to consider when implementing a sharding strategy. Determines how data is distributed
-    - A sharding key allows you to retreive and modify data efficiently by routing the database queries to the correct database.
-    - **One of the most important criteria is chosing a sharding key that can evenly distrubute the distributed data.**
-- sharding introduces additional complexity and challenges
-    - resharding data: resharding is needed when
-        1. a single shard could no longer hold the data due to growth
-        2. Uneven distribution of data might cause certain shards to experience shard exhaustion faster
-    - when shard exhaustion happens, updating the sharding function and redistributing thew data must occur.
-        - [Consistent Hashing](#consistent-hashing) is a commonly used technique to solve this problem
-    - Celebrity problem: also called a hotspot key problem.
-        - Exessive access to a specific shard can cause server overload. To mitigate this problem, a single or multiple shards may need to be allocated to a celebrity or hot key
-    - Join and de-normalization: It is hard to perform join across a db that has been sharded. A common work around is to denormalize the shard so queries can be performed in a single table
 
 ## CAP Theorem
 
@@ -444,6 +564,21 @@ Load balancer vs reverse proxy
 Disadvantage(s): reverse proxy
 - Introducing a reverse proxy results in increased complexity.
 - A single reverse proxy is a single point of failure, configuring multiple reverse proxies (ie a failover) further increases complexity.
+
+
+## Application Layer
+
+[Back to main](#contents)
+
+Separating out the web layer from the application layer (also known as platform layer) allows you to scale and configure both layers independently. Adding a new API results in adding application servers without necessarily adding additional web servers. The single responsibility principle advocates for small and autonomous services that work together. Small teams with small services can plan more aggressively for rapid growth.
+
+Microservices
+- Related to this discussion are microservices, which can be described as a suite of independently deployable, small, modular services. Each service runs a unique process and communicates through a well-defined, lightweight mechanism to serve a business goal. 1
+- Pinterest, for example, could have the following microservices: user profile, follower, feed, search, photo upload, etc.
+
+Disadvantage(s): application layer
+- Adding an application layer with loosely coupled services requires a different approach from an architectural, operations, and process viewpoint (vs a monolithic system).
+- Microservices can add complexity in terms of deployments and operations.
 
 
 ## Data Centers
