@@ -4,6 +4,7 @@
 
 1.  [System Design Framework](#system-design-framework)
 1.  [Vert vs Horz scaling](#vertical-vs-horizontal-scaling)
+1. [Latency vs Throughput](#latency-vs-throughput)
 1.  [Load balancer](#load-balancer)
 1.  [* DBs](#databases)
 1.  [DB-Partitioning-Replication Consistency-Availability](#db-partitioning-replication-consistency-availability)
@@ -13,6 +14,7 @@
 1.  [Cache](#cache)
 1.  [CDN](#cdn)
 1.  [DNS](#dns)
+1.  [Reverse Proxy](#reverse-proxy)
 1.  [Data centers](#data-centers)
 1.  [Message Queue](#message-queue)
 1.  [Web Tier; stateless vs stateful](#web-tier)
@@ -103,7 +105,15 @@ Pros
 - In the case of Datacenters, offers better latency
 - In the case of databases, offers better read and write performance
 
+## Latency-vs-throughput
 
+[Back to main](#contents)
+
+Latency is the time to perform some action or to produce some result.
+
+Throughput is the number of such actions or results per unit of time.
+
+Generally, you should aim for maximal throughput with acceptable latency.
 
 ## Load Balancer
 
@@ -273,6 +283,22 @@ Handling failiures:
     - this is why we must have multiple data centers in different locations to accoutn for power outages and the likes
     - users should still be able to process requests even if a data center is down
 
+### Availability
+
+Two complimentary patterns to support high availability:
+1. Fail-over
+2. Replication
+
+1. Fail-over (2 types)
+- Active-passive:
+    - With active-passive fail-over, heartbeats are sent between the active and the passive server on standby. If the heartbeat is interrupted, **the passive server takes over the active's IP** address and resumes service.
+    - The length of downtime is determined by whether the passive server is already running in 'hot' standby or whether it needs to start up from 'cold' standby. Only the active server handles traffic.
+    - **Active-passive failover can also be referred to as master-slave failover.**
+- Active-active:
+    - In active-active, both servers are managing traffic, spreading the load between them.
+    - If the servers are public-facing, the DNS would need to know about the public IPs of both servers. If the servers are internal-facing, application logic would need to know about both servers.
+    - Active-active failover can also be referred to as master-master failover.
+
 ## DB Scaling
 
 [Back to main](#contents)
@@ -348,10 +374,20 @@ Content Delivery Network
 
 [Back to main](#contents)
 
-A CND is a network of geographically dispersed servers used to deliver static content (CSS, HTML, JS, Images, Videos, etc).
+A CND is a network of geographically dispersed proxy servers used to deliver static content (CSS, HTML, JS, Images, Videos, etc).
+
+**Amazon has a DNS service: CloudFront**
 
 How it works:
 - When a user visits a website, a CDN server closet to the user will deliver static content. Intuitively users that are farther away from the CDN will experience slower website loads.
+
+Push CDNs
+    - Push CDNs receive new content whenever changes occur on your server. You take full responsibility for providing content, uploading directly to the CDN and rewriting URLs to point to the CDN. You can configure when content expires and when it is updated. Content is uploaded only when it is new or changed, minimizing traffic, but maximizing storage.
+    - Sites with a small amount of traffic or sites with content that isn't often updated work well with push CDNs. Content is placed on the CDNs once, instead of being re-pulled at regular intervals.
+- Pull CDNs
+    - Pull CDNs grab new content from your server when the first user requests the content. You leave the content on your server and rewrite URLs to point to the CDN. This results in a slower request until the content is cached on the CDN.
+    - A time-to-live (TTL) determines how long content is cached. Pull CDNs minimize storage space on the CDN, but can create redundant traffic if files expire and are pulled before they have actually changed.
+    - Sites with heavy traffic work well with pull CDNs, as traffic is spread out more evenly with only recently-requested content remaining on the CDN.
 
 Consideratins of using a CDN:
 - Cost: usually CDN is run by a third-party provider and you are charged for data transfers in and out of the CDN. Caching indfrequently used assets has no benefit of a CDN and should be moved out of the CDN
@@ -366,6 +402,50 @@ Consideratins of using a CDN:
 
 The Domain Name System (DNS) is the phonebook of the Internet. When users type domain names such as ‘google.com’ or ‘nytimes.com’ into web browsers, DNS is responsible for finding the correct IP address for those sites.
 
+Services such as CloudFlare and **Amazon's Route 53** provide managed DNS services. Some DNS services can route traffic through various methods:
+
+    Weighted round robin
+        Prevent traffic from going to servers under maintenance
+        Balance between varying cluster sizes
+        A/B testing
+    Latency-based
+    Geolocation-based
+
+Disadvantage(s): DNS
+- Accessing a DNS server introduces a slight delay, although mitigated by caching described above.
+- DNS server management could be complex and is generally managed by governments, ISPs, and large companies.
+
+
+## Reverse Proxy
+
+[Back to main](#contents)
+
+A reverse proxy is a web server that centralizes internal services and provides unified interfaces to the public. Requests from clients are forwarded to a server that can fulfill it before the reverse proxy returns the server's response to the client.
+
+Additional benefits include:
+
+- Increased security - Hide information about backend servers, blacklist IPs, limit number of connections per client
+- Increased scalability and flexibility - Clients only see the reverse proxy's IP, allowing you to scale servers or change their configuration
+- SSL termination (the process of decrypting encrypted traffic before passing it along to a web server) - Decrypt incoming requests and encrypt server responses so backend servers do not have to perform these potentially expensive operations
+    - Removes the need to install X.509 certificates on each server
+- Compression - Compress server responses
+- Caching - Return the response for cached requests
+- Static content - Serve static content directly
+    - HTML/CSS/JS
+    - Photos
+    - Videos
+    - Etc
+
+Load balancer vs reverse proxy
+- Deploying a load balancer is useful when you have multiple servers. Often, load balancers route traffic to a set of servers serving the same function.
+- Reverse proxies can be useful even with just one web server or application server, opening up the benefits described in the previous section.
+- Solutions such as NGINX and HAProxy can support both layer 7 reverse proxying and load balancing.
+
+Disadvantage(s): reverse proxy
+- Introducing a reverse proxy results in increased complexity.
+- A single reverse proxy is a single point of failure, configuring multiple reverse proxies (ie a failover) further increases complexity.
+
+
 ## Data Centers
 
 [Back to main](#contents)
@@ -373,6 +453,7 @@ The Domain Name System (DNS) is the phonebook of the Internet. When users type d
 Improve availability and proivide better user experience, supporting multiple data centers is crucial.
 
 Requests can be GeoDNS routed (geo-routed) to the closest data center. GeoDNS is a service that allows domain names to be resolved to IP addresses based on the locaiton of a user.
+
 
 Pros
 - In the event of a data center outage, all traffic can be directed to another data center
@@ -382,6 +463,7 @@ Considerations of Data Centers
 - Traffic routing: using GeoDNS requests can be routed to the nearest data center to help with latency
 - Data syncronization: Users from different regions could use different local databases or caches. In failover cases, the traffic could be routed to a different data center. Therefore a common strategy is to replciate the data among data centers.
 - Test and deployment: With multi-data center setups, it is important to test the website/app in different locations. Automated deployment/test/build tools are crucial.
+
 
 ## Message Queue
 
