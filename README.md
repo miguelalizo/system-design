@@ -175,6 +175,8 @@ Pros
 
 ## Databases
 
+TODO: complete section by documenting database types, common usages and concrete examples (i.e. DynamoDB, etc)
+
 [Back to main](#contents)
 
 ### SQL
